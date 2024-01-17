@@ -20,12 +20,10 @@ LEADERBOARD_DISPLAY_COLS = [
     'developer_uid',
     'model_name',
     'submission_id',
-    'is_custom_reward',
     'stay_in_character',
     'user_preference',
     'entertaining',
     'overall_rank',
-    'repetition',
     'safety_score',
     'thumbs_up_ratio',
     'total_feedback_count',
@@ -33,19 +31,11 @@ LEADERBOARD_DISPLAY_COLS = [
 ]
 
 COMPETITON_LEADERBOARD_DISPLAY_COLS = [
-    'developer_uid',
     'model_name',
     'thumbs_up_ratio',
     'overall_rank',
     'total_feedback_count',
-    'repetition',
-    'stay_in_character',
-    'user_preference',
-    'entertaining',
-    'safety_score',
-    'is_custom_reward',
-    'submission_id',
-    'model_parameter_size',
+    'submission_id'
 ]
 
 MODEL_EVAL_SCORE_COLS = ['stay_in_character', 'user_preference', 'entertaining']
@@ -128,30 +118,29 @@ def get_display_leaderboard(df, detailed):
 
 
 def get_display_competition_leaderboard(df):
-    df = _get_deduped_leaderboard(df)
+    #df = _get_deduped_leaderboard(df)
     df = df[COMPETITON_LEADERBOARD_DISPLAY_COLS]
     return df
 
 
 @auto_authenticate
 def get_raw_leaderboard(max_workers=DEFAULT_MAX_WORKERS, developer_key=None, time_range_in_sec=None, submission_ids=None):
-    submissions = get_all_historical_submissions(developer_key)
-    submissions = _filter_submissions(submissions, submission_ids) if submission_ids else submissions
+    #submissions = get_all_historical_submissions(developer_key)
+    submissions = _fill_submission_ids(submission_ids) if submission_ids else submissions
     leaderboard = distribute_to_workers(
         get_leaderboard_row,
         submissions.items(),
         developer_key=developer_key,
         time_range_in_sec=time_range_in_sec,
-        max_workers=max_workers
+        max_workers=1
     )
     return pd.DataFrame(leaderboard)
 
 
-def _filter_submissions(submissions, submission_ids):
+def _fill_submission_ids(submission_ids):
     filtered_submissions = {
-        submission_id: data
-        for submission_id, data in submissions.items()
-        if submission_id in submission_ids
+            submission_id: {"thumbs_up" : 0, "thumbs_down" : 0}
+        for submission_id in submission_ids
     }
     return filtered_submissions
 
@@ -181,7 +170,6 @@ def calc_metrics(feedback_metrics):
             'mcl': feedback_metrics.mcl,
             'thumbs_up_ratio': feedback_metrics.thumbs_up_ratio,
             'thumbs_up_ratio_se': feedback_metrics.thumbs_up_ratio_se,
-            'repetition': feedback_metrics.repetition_score,
             'total_feedback_count': feedback_metrics.total_feedback_count,
         }
     return metrics
@@ -229,12 +217,6 @@ class FeedbackMetrics():
     def mcl(self):
         return np.mean([m.mcl for m in self.convo_metrics])
 
-    @property
-    def repetition_score(self):
-        scores = np.array([m.repetition_score for m in self.convo_metrics])
-        is_public = np.array([feedback.get('public', True) for feedback in self.feedbacks])
-        breakpoint()
-        return np.nanmean(scores[is_public])
 
 
 def _insert_server_timestamp(feedback_dict):
@@ -260,22 +242,11 @@ class ConversationMetrics():
     def mcl(self):
         return len([m for m in self.messages if not m['deleted']])
 
-    @property
-    def repetition_score(self):
-        responses = [m['content'] for m in self.messages if not self._is_from_user(m)]
-        score = np.nan if len(responses) < 2 else get_repetition_score(responses)
-        return score
 
     def _is_from_user(self, message):
         return '_bot' not in message['sender']['uid']
 
 
-def get_repetition_score(responses):
-    # average jaccard similarities over unigrams
-    list_of_tokens = _tokenize_responses(responses)
-    pairs = zip(list_of_tokens[:-1], list_of_tokens[1:])
-    similarities = [_get_jaccard_similarity(set1, set2) for set1, set2 in pairs]
-    return np.mean(similarities)
 
 
 def _get_jaccard_similarity(set1, set2):
@@ -333,9 +304,9 @@ def _fill_default_value(df, field, default_value):
 
 
 def _get_formatted_leaderboard(df):
-    df['timestamp'] = df.apply(lambda x: datetime.fromisoformat(x['timestamp']), axis=1)
-    df['date'] = df['timestamp'].dt.date
-    df.drop(['timestamp'], axis=1, inplace=True)
+    #df['timestamp'] = df.apply(lambda x: datetime.fromisoformat(x['timestamp']), axis=1)
+    #df['date'] = df['timestamp'].dt.date
+    #df.drop(['timestamp'], axis=1, inplace=True)
     df['is_custom_reward'] = df['is_custom_reward'].replace({
         True: '✅',
         False: '❌'
@@ -345,7 +316,7 @@ def _get_formatted_leaderboard(df):
 
 
 def _get_submissions_with_unique_model(df):
-    df = df.drop_duplicates(subset=['model_repo', 'reward_repo'], keep='first')
+    #df = df.drop_duplicates(subset=['model_repo', 'reward_repo'], keep='first')
     return df
 
 
