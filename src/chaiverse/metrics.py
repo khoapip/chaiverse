@@ -149,7 +149,7 @@ def get_leaderboard_row(submission_item, developer_key=None, time_range_in_sec=N
     submission_id, meta_data = submission_item
     server_feedback_no = int(meta_data["thumbs_up"]) + int(meta_data["thumbs_down"])
     is_updated = is_submission_updated(submission_id, server_feedback_no)
-    metrics = get_submission_metrics(submission_id, developer_key, reload=is_updated, time_range_in_sec=time_range_in_sec)
+    metrics = get_submission_metrics(submission_id, developer_key, reload=True, time_range_in_sec=time_range_in_sec)
     return {'submission_id': submission_id, **meta_data, **metrics}
 
 
